@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ZLS · Capturar Tareas</title>
+<style>
+  :root{
+    --cream:#FBF8F3; --taupe:#9B8B7A; --cocoa:#6B5847; --ink:#2C2620;
+    --sand:#EDE5D8; --line:#DDD2C2; --ok:#5A6E55; --err:#9A5B4F; --rec:#9A5B4F;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--cream);color:var(--ink);font-family:Georgia,"Times New Roman",serif;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:680px;margin:0 auto;padding:48px 24px 80px}
+  .eyebrow{font-family:Arial,Helvetica,sans-serif;letter-spacing:.28em;text-transform:uppercase;font-size:11px;color:var(--taupe);margin:0 0 14px}
+  h1{font-weight:400;font-size:30px;letter-spacing:.01em;margin:0 0 14px}
+  .lede{font-size:16px;color:var(--cocoa);margin:0 0 8px;max-width:54ch}
+  .rule{height:1px;background:var(--line);border:0;margin:34px 0}
+  .section-title{font-family:Arial,Helvetica,sans-serif;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--taupe);margin:0 0 18px}
+  label{display:block;font-family:Arial,Helvetica,sans-serif;font-size:13px;letter-spacing:.02em;color:var(--cocoa);margin:0 0 7px}
+  .field{margin:0 0 22px}
+  input[type=text],select,textarea{width:100%;background:#fff;border:1px solid var(--line);border-radius:4px;padding:12px 14px;font-family:Arial,Helvetica,sans-serif;font-size:15px;color:var(--ink);transition:border-color .15s ease}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--taupe)}
+  textarea{min-height:200px;resize:vertical;line-height:1.55}
+  .hint{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:var(--taupe);margin:6px 0 0}
+  .row{display:flex;gap:18px;flex-wrap:wrap}
+  .row > .field{flex:1;min-width:220px}
+
+  /* segmented mode toggle */
+  .modes{display:flex;gap:0;border:1px solid var(--line);border-radius:6px;overflow:hidden;margin:0 0 20px;max-width:360px}
+  .modes button{flex:1;background:#fff;border:0;padding:12px;font-family:Arial,Helvetica,sans-serif;font-size:13px;letter-spacing:.04em;color:var(--cocoa);cursor:pointer;transition:background .15s ease}
+  .modes button.active{background:var(--ink);color:var(--cream)}
+  .pane{display:none}.pane.active{display:block}
+
+  /* recorder */
+  .recorder{background:var(--sand);border:1px solid var(--line);border-radius:8px;padding:28px 22px;text-align:center}
+  .rec-btn{width:84px;height:84px;border-radius:50%;border:0;background:var(--ink);color:var(--cream);font-family:Arial,Helvetica,sans-serif;font-size:12px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:transform .15s ease,background .15s ease;display:inline-flex;align-items:center;justify-content:center;line-height:1.2}
+  .rec-btn:hover{transform:scale(1.04)}
+  .rec-btn.recording{background:var(--rec);animation:pulse 1.3s ease-in-out infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(154,91,79,.5)}50%{box-shadow:0 0 0 16px rgba(154,91,79,0)}}
+  .timer{font-family:Arial,Helvetica,sans-serif;font-size:26px;color:var(--ink);margin:18px 0 4px;letter-spacing:.04em}
+  .rec-state{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:var(--taupe)}
+  .playback{margin-top:18px;display:none}
+  .playback audio{width:100%}
+  .redo{background:none;border:0;color:var(--cocoa);font-family:Arial,Helvetica,sans-serif;font-size:12px;text-decoration:underline;cursor:pointer;margin-top:10px}
+
+  button.submit{width:100%;margin-top:30px;background:var(--ink);color:var(--cream);border:0;border-radius:4px;padding:16px;font-family:Arial,Helvetica,sans-serif;font-size:13px;letter-spacing:.16em;text-transform:uppercase;cursor:pointer;transition:background .15s ease}
+  button.submit:hover{background:#3b332b}
+  button.submit:disabled{background:var(--taupe);cursor:default}
+  .err-msg{color:var(--err);font-family:Arial,Helvetica,sans-serif;font-size:12px;margin:10px 0 0;display:none}
+  .state{display:none;text-align:center;padding:60px 20px}
+  .state h2{font-weight:400;font-size:24px;margin:0 0 12px}
+  .state p{color:var(--cocoa);max-width:46ch;margin:0 auto}
+  .spinner{width:34px;height:34px;margin:0 auto 22px;border:3px solid var(--sand);border-top-color:var(--cocoa);border-radius:50%;animation:spin .9s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .footer-note{font-family:Arial,Helvetica,sans-serif;font-size:11px;color:var(--taupe);text-align:center;margin-top:40px;letter-spacing:.04em}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="formView">
+    <p class="eyebrow">ZLS · Sistema de Operaciones</p>
+    <h1>Capturar tareas</h1>
+    <p class="lede">Grabe un mensaje de voz o pegue una transcripción de junta. El agente extrae las tareas, responsables y fechas; usted las confirma en monday.</p>
+    <hr class="rule">
+
+    <form id="captureForm" novalidate>
+      <div class="row">
+        <div class="field">
+          <label for="source">Fuente</label>
+          <select id="source"><option>Meeting Transcript</option><option>Voice Note</option><option>WhatsApp</option><option>Email</option><option>Idea</option><option>Other</option></select>
+        </div>
+        <div class="field">
+          <label for="project">Proyecto</label>
+          <select id="project"><option>Zen Park</option><option>ZEC</option><option>ZLS General</option></select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="submitter">Su nombre</label>
+        <input type="text" id="submitter" placeholder="Lorenza">
+      </div>
+
+      <hr class="rule">
+      <p class="section-title">Contenido</p>
+      <div class="modes">
+        <button type="button" id="mVoice" class="active">🎙 Grabar voz</button>
+        <button type="button" id="mText">⌨ Pegar texto</button>
+      </div>
+
+      <!-- VOICE -->
+      <div class="pane active" id="voicePane">
+        <div class="recorder">
+          <button type="button" class="rec-btn" id="recBtn">Grabar</button>
+          <div class="timer" id="timer">0:00</div>
+          <div class="rec-state" id="recState">Toque para grabar su mensaje</div>
+          <div class="playback" id="playback"><audio id="audioEl" controls></audio><br><button type="button" class="redo" id="redoBtn">Grabar de nuevo</button></div>
+        </div>
+        <p class="hint">Su voz se transcribe automáticamente (Whisper) y de ahí se extraen las tareas.</p>
+      </div>
+
+      <!-- TEXT -->
+      <div class="pane" id="textPane">
+        <textarea id="text" placeholder="Pegue aquí la transcripción de la junta o el mensaje…"></textarea>
+        <p class="hint">El agente solo extrae compromisos reales (tareas, entregables, fechas), no la conversación.</p>
+      </div>
+
+      <button type="submit" class="submit" id="submitBtn">Extraer tareas</button>
+      <p class="err-msg" id="errMsg"></p>
+    </form>
+    <p class="footer-note">Confidencial · ZLS Operations Engine</p>
+  </div>
+
+  <div class="state" id="sendingView"><div class="spinner"></div><h2>Procesando…</h2><p>Extrayendo las tareas. Un momento, por favor.</p></div>
+  <div class="state" id="successView"><h2>Enviado</h2><p>Revise las tareas propuestas en monday (Requests Intake) para confirmarlas.</p><button class="submit" style="max-width:260px;margin:26px auto 0" onclick="location.reload()">Capturar otro</button></div>
+  <div class="state" id="errorView"><h2>No se pudo enviar</h2><p id="errorText">Ocurrió un problema de conexión.</p><button class="submit" style="max-width:260px;margin:26px auto 0" onclick="location.reload()">Reintentar</button></div>
+</div>
+
+<script>
+const WEBHOOK_URL = "https://hook.us2.make.com/7d3eqpnkhqnq5axom55gtjdsf93vkzaa";
+const $ = id => document.getElementById(id);
+let mode = "voice";
+
+/* mode toggle */
+$("mVoice").onclick = () => setMode("voice");
+$("mText").onclick = () => setMode("text");
+function setMode(m){
+  mode = m;
+  $("mVoice").classList.toggle("active", m==="voice");
+  $("mText").classList.toggle("active", m==="text");
+  $("voicePane").classList.toggle("active", m==="voice");
+  $("textPane").classList.toggle("active", m==="text");
+  $("source").value = m==="voice" ? "Voice Note" : "Meeting Transcript";
+}
+
+/* recorder */
+let mediaRecorder=null, chunks=[], audioData=null, audioType=null, startTime=0, timerInt=null, stream=null;
+const recBtn=$("recBtn"), timer=$("timer"), recState=$("recState"), playback=$("playback"), audioEl=$("audioEl");
+function pickMime(){ return ["audio/webm","audio/mp4","audio/ogg"].find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || ""; }
+function fmt(s){ const m=Math.floor(s/60), ss=String(s%60).padStart(2,"0"); return m+":"+ss; }
+
+recBtn.onclick = async () => {
+  if(mediaRecorder && mediaRecorder.state === "recording"){ mediaRecorder.stop(); return; }
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({audio:true});
+  }catch(e){ recState.textContent = "No se pudo acceder al micrófono. Permita el acceso e intente de nuevo."; return; }
+  const mime = pickMime(); chunks = [];
+  mediaRecorder = new MediaRecorder(stream, mime ? {mimeType:mime} : undefined);
+  mediaRecorder.ondataavailable = e => { if(e.data.size) chunks.push(e.data); };
+  mediaRecorder.onstop = () => {
+    clearInterval(timerInt);
+    const blob = new Blob(chunks, {type: mime || "audio/webm"});
+    audioType = blob.type;
+    audioEl.src = URL.createObjectURL(blob);
+    const r = new FileReader(); r.onload = e => audioData = e.target.result; r.readAsDataURL(blob);
+    playback.style.display = "block";
+    recBtn.textContent = "Grabar"; recBtn.classList.remove("recording");
+    recState.textContent = "Listo. Escuche su grabación o envíe.";
+    if(stream) stream.getTracks().forEach(t=>t.stop());
+  };
+  mediaRecorder.start();
+  startTime = Date.now(); audioData = null; playback.style.display="none";
+  recBtn.textContent = "Detener"; recBtn.classList.add("recording");
+  recState.textContent = "Grabando… toque para detener.";
+  timerInt = setInterval(()=> timer.textContent = fmt(Math.floor((Date.now()-startTime)/1000)), 250);
+};
+$("redoBtn").onclick = () => { audioData=null; playback.style.display="none"; timer.textContent="0:00"; recState.textContent="Toque para grabar su mensaje"; };
+
+/* submit */
+$("captureForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const err = $("errMsg"); err.style.display="none";
+  const base = { source:$("source").value, project:$("project").value, submitter:$("submitter").value||"—", enviado_en:new Date().toISOString() };
+  let payload;
+  if(mode==="voice"){
+    if(!audioData){ err.textContent="Grabe un mensaje de voz primero."; err.style.display="block"; return; }
+    payload = {...base, input_type:"voice", audio_base64:audioData, audio_type:audioType, filename:"voicenote."+(audioType.includes("mp4")?"mp4":"webm")};
+  } else {
+    if($("text").value.trim().length < 10){ err.textContent="Pegue el texto a procesar."; err.style.display="block"; return; }
+    payload = {...base, input_type:"text", text:$("text").value};
+  }
+  show("sendingView");
+  try{
+    const res = await fetch(WEBHOOK_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=UTF-8"},body:JSON.stringify(payload)});
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    show("successView");
+  }catch(e2){ $("errorText").textContent="Ocurrió un problema al enviar ("+e2.message+")."; show("errorView"); }
+});
+function show(v){["formView","sendingView","successView","errorView"].forEach(id=>$(id).style.display=(id===v)?"block":"none");window.scrollTo({top:0,behavior:"smooth"});}
+</script>
+</body>
+</html>
