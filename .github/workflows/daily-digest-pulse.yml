@@ -1,0 +1,27 @@
+name: Daily Digest Pulse (ZLS)
+
+# Pings the Make.com "Daily Digest" webhook once a day to trigger the ZLS Ops Engine digest.
+# NOTE on scheduling:
+#   - GitHub Actions cron is ALWAYS in UTC.
+#   - 12:00 UTC == 07:00 in Cancun (UTC-5, no DST), the intended ~7am local trigger.
+#   - GitHub-scheduled runs can lag 5-30 min (or skip under load), so treat the time as approximate.
+#   - The Make digest scenario must be ACTIVE for this pulse to actually deliver a digest;
+#     if it's inactive, Make will still accept the POST but won't do anything downstream.
+
+on:
+  schedule:
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pulse:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Make webhook
+        env:
+          DIGEST_WEBHOOK_URL: ${{ secrets.DIGEST_WEBHOOK_URL }}
+        run: |
+          curl -fsS -X POST -H "Content-Type: application/json" -d '{"pulse":"daily-digest-castor","source":"github-actions"}' "$DIGEST_WEBHOOK_URL"
